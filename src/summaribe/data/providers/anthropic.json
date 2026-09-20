@@ -1,0 +1,34 @@
+{
+  "id": "anthropic",
+  "name": "Anthropic",
+  "description": "Anthropic Messages API. Requires the ANTHROPIC_API_KEY environment variable.",
+  "base_url": "https://api.anthropic.com",
+  "endpoint": "/v1/messages",
+  "method": "POST",
+  "headers": {
+    "x-api-key": "{{api_key}}",
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json"
+  },
+  "api_key_env": "ANTHROPIC_API_KEY",
+  "timeout_seconds": 120,
+  "stream": false,
+  "stream_format": "sse",
+  "request_template": {
+    "model": "{{model}}",
+    "system": "{{system_prompt}}",
+    "messages": [
+      { "role": "user", "content": "{{user_prompt}}" }
+    ],
+    "max_tokens": "{{max_tokens}}",
+    "temperature": "{{temperature}}",
+    "stream": "{{stream}}"
+  },
+  "response_path": "content.0.text",
+  "stream_delta_path": "delta.text",
+  "variables": {
+    "model": "claude-sonnet-5",
+    "temperature": 0.3,
+    "max_tokens": 2048
+  }
+}

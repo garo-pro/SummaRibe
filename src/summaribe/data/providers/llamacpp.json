@@ -1,0 +1,28 @@
+{
+  "id": "llamacpp",
+  "name": "llama.cpp server",
+  "description": "Self-hosted llama-server, using its OpenAI-compatible /v1/chat/completions endpoint.",
+  "base_url": "http://localhost:8080",
+  "endpoint": "/v1/chat/completions",
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "timeout_seconds": 180,
+  "stream": false,
+  "stream_format": "sse",
+  "request_template": {
+    "model": "{{model}}",
+    "messages": "{{messages}}",
+    "temperature": "{{temperature}}",
+    "max_tokens": "{{max_tokens}}",
+    "stream": "{{stream}}"
+  },
+  "response_path": "choices.0.message.content",
+  "stream_delta_path": "choices.0.delta.content",
+  "variables": {
+    "model": "local-model",
+    "temperature": 0.3,
+    "max_tokens": 2048
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "openrouter",
+  "name": "OpenRouter",
+  "description": "OpenRouter's OpenAI-compatible /v1/chat/completions endpoint. Requires the OPENROUTER_API_KEY environment variable.",
+  "base_url": "https://openrouter.ai/api",
+  "endpoint": "/v1/chat/completions",
+  "method": "POST",
+  "headers": {
+    "Authorization": "Bearer {{api_key}}",
+    "Content-Type": "application/json"
+  },
+  "api_key_env": "OPENROUTER_API_KEY",
+  "timeout_seconds": 120,
+  "stream": false,
+  "stream_format": "sse",
+  "request_template": {
+    "model": "{{model}}",
+    "messages": "{{messages}}",
+    "temperature": "{{temperature}}",
+    "max_tokens": "{{max_tokens}}",
+    "stream": "{{stream}}"
+  },
+  "response_path": "choices.0.message.content",
+  "stream_delta_path": "choices.0.delta.content",
+  "variables": {
+    "model": "openrouter/auto",
+    "temperature": 0.3,
+    "max_tokens": 2048
+  }
+}

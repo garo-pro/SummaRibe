@@ -1,0 +1,30 @@
+{
+  "id": "ollama",
+  "name": "Ollama (local)",
+  "description": "Local Ollama server using its native /api/chat endpoint (NDJSON streaming).",
+  "base_url": "http://localhost:11434",
+  "endpoint": "/api/chat",
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "timeout_seconds": 120,
+  "stream": false,
+  "stream_format": "ndjson",
+  "request_template": {
+    "model": "{{model}}",
+    "messages": "{{messages}}",
+    "stream": "{{stream}}",
+    "options": {
+      "temperature": "{{temperature}}"
+    }
+  },
+  "response_path": "message.content",
+  "stream_delta_path": "message.content",
+  "stream_done_path": "done",
+  "variables": {
+    "model": "llama3.1",
+    "temperature": 0.3,
+    "max_tokens": 2048
+  }
+}
