@@ -16,7 +16,8 @@
     "messages": "{{messages}}",
     "stream": "{{stream}}",
     "options": {
-      "temperature": "{{temperature}}"
+      "temperature": "{{temperature}}",
+      "num_predict": "{{max_tokens}}"
     }
   },
   "response_path": "message.content",

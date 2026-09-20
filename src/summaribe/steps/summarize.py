@@ -29,7 +29,11 @@ class SummarizeStep(PipelineStep):
         source_text = context.transcript_improved or context.transcript_raw
         assert source_text is not None  # guaranteed by `validate`
         ai_settings = context.settings.ai
-        client = ProviderStore().client_for(ai_settings.summarize_provider_id)
+        client = ProviderStore().client_for(
+            ai_settings.summarize_provider_id,
+            stream=ai_settings.streaming,
+            timeout_seconds=ai_settings.timeout_seconds,
+        )
         prompt = PromptStore().get(ai_settings.summarize_prompt_id)
 
         def _on_token(token: str) -> None:

@@ -39,7 +39,6 @@ class SettingsPanel(wx.Panel):
         self.audio_quality_ctrl = wx.SpinCtrl(general_parent, min=32, max=320)
         self.keep_intermediate_ctrl = wx.CheckBox(general_parent)
         self.output_formats_ctrl = wx.CheckListBox(general_parent, choices=_OUTPUT_FORMATS)
-        self.max_workers_ctrl = wx.SpinCtrl(general_parent, min=1, max=32)
         self.log_level_ctrl = wx.Choice(general_parent, choices=_LOG_LEVELS)
         for label, ctrl in [
             ("Working directory", self.work_dir_ctrl),
@@ -47,7 +46,6 @@ class SettingsPanel(wx.Panel):
             ("Audio quality (kbps)", self.audio_quality_ctrl),
             ("Keep intermediate files", self.keep_intermediate_ctrl),
             ("Output formats", self.output_formats_ctrl),
-            ("Max parallel workers", self.max_workers_ctrl),
             ("Log level", self.log_level_ctrl),
         ]:
             grid.Add(wx.StaticText(general_parent, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
@@ -157,7 +155,6 @@ class SettingsPanel(wx.Panel):
         self.keep_intermediate_ctrl.SetValue(settings.keep_intermediate_files)
         for index, fmt in enumerate(_OUTPUT_FORMATS):
             self.output_formats_ctrl.Check(index, fmt in settings.output_formats)
-        self.max_workers_ctrl.SetValue(settings.max_workers)
         self.log_level_ctrl.SetStringSelection(settings.log_level)
 
         t = settings.transcription
@@ -201,24 +198,34 @@ class SettingsPanel(wx.Panel):
             for index, fmt in enumerate(_OUTPUT_FORMATS)
             if self.output_formats_ctrl.IsChecked(index)
         ]
-        settings.max_workers = self.max_workers_ctrl.GetValue()
         settings.log_level = self.log_level_ctrl.GetStringSelection() or settings.log_level  # type: ignore[assignment]
 
         settings.transcription.default_provider = (
             self.transcription_provider_ctrl.GetStringSelection()
+            or settings.transcription.default_provider
         )
         settings.transcription.model = self.transcription_model_ctrl.GetValue()
         settings.transcription.model_path = self.transcription_model_path_ctrl.GetPath() or None
-        settings.transcription.device = self.transcription_device_ctrl.GetStringSelection()
+        settings.transcription.device = (
+            self.transcription_device_ctrl.GetStringSelection() or settings.transcription.device
+        )
         settings.transcription.compute_type = self.transcription_compute_type_ctrl.GetValue()
         settings.transcription.language = (
             self.transcription_language_ctrl.GetValue().strip() or None
         )
 
-        settings.ai.improve_provider_id = self.improve_provider_ctrl.GetStringSelection()
-        settings.ai.improve_prompt_id = self.improve_prompt_ctrl.GetStringSelection()
-        settings.ai.summarize_provider_id = self.summarize_provider_ctrl.GetStringSelection()
-        settings.ai.summarize_prompt_id = self.summarize_prompt_ctrl.GetStringSelection()
+        settings.ai.improve_provider_id = (
+            self.improve_provider_ctrl.GetStringSelection() or settings.ai.improve_provider_id
+        )
+        settings.ai.improve_prompt_id = (
+            self.improve_prompt_ctrl.GetStringSelection() or settings.ai.improve_prompt_id
+        )
+        settings.ai.summarize_provider_id = (
+            self.summarize_provider_ctrl.GetStringSelection() or settings.ai.summarize_provider_id
+        )
+        settings.ai.summarize_prompt_id = (
+            self.summarize_prompt_ctrl.GetStringSelection() or settings.ai.summarize_prompt_id
+        )
         settings.ai.streaming = self.streaming_ctrl.GetValue()
         settings.ai.timeout_seconds = self.timeout_ctrl.GetValue()
         settings.ai.temperature = self.temperature_ctrl.GetValue()

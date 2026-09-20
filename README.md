@@ -73,7 +73,15 @@ uv run summaribe summarize ./out/improved.txt --out ./out/summary.md
 ```bash
 uv run summaribe run "https://example.com/watch?v=..." --out-dir ./out
 uv run summaribe run "https://example.com/watch?v=..." --steps download,transcribe
+
+# Or start from a local file instead of a URL (no 'download' step, so no URL needed):
+uv run summaribe run --file ./out/abc123.mp3 --steps transcribe,improve,summarize
 ```
+
+`run` writes whichever of `transcript.raw.txt` / `transcript.improved.txt` /
+`summary.md` / `transcript.srt` / `transcript.vtt` / `result.json` are relevant,
+based on `settings.output_formats` (`srt`/`vtt` need segment timings, which not
+every transcription provider produces).
 
 Manage providers, prompts, dictionaries, and settings:
 

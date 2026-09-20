@@ -33,6 +33,46 @@ def test_settings_show_prints_json():
     assert "audio_format" in result.stdout
 
 
+def test_prompts_list_rejects_unknown_category():
+    result = runner.invoke(app, ["prompts", "list", "--category", "not-a-category"])
+    assert result.exit_code != 0
+
+
+def test_run_requires_url_when_download_step_included(tmp_path: Path):
+    result = runner.invoke(app, ["run", "--work-dir", str(tmp_path)])
+    assert result.exit_code != 0
+
+
+def test_run_requires_file_when_download_step_excluded(tmp_path: Path):
+    result = runner.invoke(app, ["run", "--work-dir", str(tmp_path), "--steps", "transcribe"])
+    assert result.exit_code != 0
+
+
+def test_run_chains_from_local_transcript_file(monkeypatch, tmp_path: Path):
+    transcript_path = tmp_path / "transcript.txt"
+    transcript_path.write_text("raw text", encoding="utf-8")
+
+    from summaribe.ai.provider import AIClient
+
+    monkeypatch.setattr(AIClient, "complete", lambda self, **kwargs: "cleaned")
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--file",
+            str(transcript_path),
+            "--work-dir",
+            str(tmp_path),
+            "--steps",
+            "improve,summarize",
+        ],
+    )
+    assert result.exit_code == 0
+    assert (tmp_path / "transcript.improved.txt").read_text(encoding="utf-8") == "cleaned"
+    assert (tmp_path / "summary.md").read_text(encoding="utf-8") == "cleaned"
+
+
 def test_improve_step_uses_ai_provider(monkeypatch, tmp_path: Path):
     transcript_path = tmp_path / "transcript.txt"
     transcript_path.write_text("raw text", encoding="utf-8")

@@ -4574,6 +4574,7 @@ all = [
     { name = "accelerate" },
     { name = "faster-whisper" },
     { name = "nemo-toolkit", extra = ["asr"] },
+    { name = "soundfile" },
     { name = "torch" },
     { name = "transformers" },
     { name = "wxpython" },
@@ -4586,6 +4587,7 @@ parakeet = [
 ]
 qwen = [
     { name = "accelerate" },
+    { name = "soundfile" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -4612,6 +4614,7 @@ requires-dist = [
     { name = "platformdirs", specifier = ">=4.2" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "rich", specifier = ">=13.7" },
+    { name = "soundfile", marker = "extra == 'qwen'", specifier = ">=0.12" },
     { name = "summaribe", extras = ["gui", "whisper", "parakeet", "qwen"], marker = "extra == 'all'" },
     { name = "torch", marker = "extra == 'qwen'", specifier = ">=2.3" },
     { name = "transformers", marker = "extra == 'qwen'", specifier = ">=4.44" },

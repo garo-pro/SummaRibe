@@ -37,6 +37,24 @@ def test_provider_store_unknown_id_raises():
         ProviderStore().get("does-not-exist")
 
 
+def test_client_for_applies_stream_and_timeout_overrides():
+    store = ProviderStore()
+    default_config = store.get("ollama")
+    assert default_config.stream is False
+
+    client = store.client_for("ollama", stream=True, timeout_seconds=42.0)
+    assert client.config.stream is True
+    assert client.config.timeout_seconds == 42.0
+    # the underlying stored config is untouched
+    assert store.get("ollama").stream is False
+
+
+def test_client_for_without_overrides_uses_stored_config():
+    store = ProviderStore()
+    client = store.client_for("ollama")
+    assert client.config.stream is False
+
+
 def test_prompt_store_lists_defaults_by_category():
     store = PromptStore()
     improve_ids = {p.id for p in store.list_by_category("improve")}

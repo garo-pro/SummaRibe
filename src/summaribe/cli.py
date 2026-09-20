@@ -7,14 +7,16 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, get_args
 
 import typer
 from rich.console import Console
 
-from summaribe.ai.prompts import PromptStore
+from summaribe.ai.prompts import PromptCategory, PromptStore
 from summaribe.ai.registry import ProviderStore
 from summaribe.core.config import SettingsManager
+from summaribe.core.logging_setup import configure_logging
+from summaribe.core.output_writer import write_outputs
 from summaribe.core.pipeline import Pipeline, PipelineContext, PipelineStep
 from summaribe.dictionary.filter import Dictionary, DictionaryStore
 from summaribe.steps import DownloadStep, ImproveStep, SummarizeStep, TranscribeStep
@@ -32,6 +34,12 @@ app.add_typer(dictionary_app, name="dictionary")
 app.add_typer(settings_app, name="settings")
 
 console = Console()
+
+
+@app.callback()
+def _main() -> None:
+    configure_logging(SettingsManager().settings.log_level)
+
 
 STEP_BY_NAME: dict[str, Callable[[], PipelineStep]] = {
     "download": DownloadStep,
@@ -127,7 +135,15 @@ def summarize(
 
 @app.command()
 def run(
-    url: str,
+    url: Annotated[
+        str | None, typer.Argument(help="URL to download. Required unless --file is given.")
+    ] = None,
+    file: Annotated[
+        Path | None,
+        typer.Option(
+            help="Start from a local audio file or transcript text file instead of a URL."
+        ),
+    ] = None,
     work_dir: Annotated[
         Path, typer.Option(help="Directory intermediate and output files go into.")
     ] = Path(),
@@ -138,31 +154,61 @@ def run(
         ),
     ] = "download,transcribe,improve,summarize",
     out_dir: Annotated[
-        Path | None, typer.Option(help="Write transcript/summary text files here.")
+        Path | None, typer.Option(help="Write result files here (defaults to --work-dir).")
     ] = None,
 ) -> None:
-    """Chain multiple steps together starting from a URL."""
+    """Chain multiple steps together, starting from either a URL or a local file."""
     step_names = [s.strip() for s in steps.split(",") if s.strip()]
     unknown = [s for s in step_names if s not in STEP_BY_NAME]
     if unknown:
         raise typer.BadParameter(f"Unknown step(s): {unknown}. Choose from {list(STEP_BY_NAME)}.")
 
     context = _load_context(work_dir)
-    context.source_url = url
+    if "download" in step_names:
+        if url is None:
+            raise typer.BadParameter("A URL is required when 'download' is one of --steps.")
+        context.source_url = url
+    else:
+        if file is None:
+            raise typer.BadParameter("--file is required when 'download' is not one of --steps.")
+        if file.suffix.lower() in {".txt", ".md"}:
+            context.transcript_raw = file.read_text(encoding="utf-8")
+        else:
+            context.audio_path = file
+
     pipeline = Pipeline([STEP_BY_NAME[name]() for name in step_names])
     context = pipeline.run(context, on_progress=_progress_printer)
 
     destination = out_dir or work_dir
-    destination.mkdir(parents=True, exist_ok=True)
-    if context.transcript_raw:
-        (destination / "transcript.raw.txt").write_text(context.transcript_raw, encoding="utf-8")
-    if context.transcript_improved:
-        (destination / "transcript.improved.txt").write_text(
-            context.transcript_improved, encoding="utf-8"
-        )
-    if context.summary:
-        (destination / "summary.md").write_text(context.summary, encoding="utf-8")
-    console.print(f"[green]Done. Output written under {destination}[/green]")
+    written = write_outputs(destination, context, context.settings.output_formats)
+
+    if not context.settings.keep_intermediate_files:
+        if context.audio_path and context.audio_path.exists() and context.transcript_raw:
+            context.audio_path.unlink()
+        if context.transcript_improved:
+            raw_txt = destination / "transcript.raw.txt"
+            if raw_txt in written:
+                raw_txt.unlink()
+                written.remove(raw_txt)
+
+    console.print(
+        f"[green]Done. Wrote: {', '.join(str(p) for p in written) or '(nothing)'}[/green]"
+    )
+
+    if context.settings.gui.auto_open_output_folder:
+        _open_folder(destination)
+
+
+def _open_folder(path: Path) -> None:
+    import subprocess
+    import sys
+
+    if sys.platform == "win32":
+        subprocess.run(["explorer", str(path)], check=False)
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(path)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(path)], check=False)
 
 
 @app.command()
@@ -209,8 +255,15 @@ def providers_import(path: Path) -> None:
 
 @providers_app.command("delete")
 def providers_delete(provider_id: str) -> None:
-    ProviderStore().delete(provider_id)
-    console.print(f"[green]Deleted user override for {provider_id!r}.[/green]")
+    store = ProviderStore()
+    was_override = store.is_default(provider_id)
+    store.delete(provider_id)
+    if was_override:
+        console.print(
+            f"[green]Removed override; {provider_id!r} reverted to its packaged default.[/green]"
+        )
+    else:
+        console.print(f"[green]Deleted provider {provider_id!r}.[/green]")
 
 
 # --- prompts -------------------------------------------------------------
@@ -218,6 +271,8 @@ def providers_delete(provider_id: str) -> None:
 
 @prompts_app.command("list")
 def prompts_list(category: Annotated[str | None, typer.Option()] = None) -> None:
+    if category is not None and category not in get_args(PromptCategory):
+        raise typer.BadParameter(f"category must be one of {get_args(PromptCategory)}")
     store = PromptStore()
     items = store.list_by_category(category) if category else store.list()  # type: ignore[arg-type]
     for prompt in items:
@@ -241,8 +296,15 @@ def prompts_import(path: Path) -> None:
 
 @prompts_app.command("delete")
 def prompts_delete(prompt_id: str) -> None:
-    PromptStore().delete(prompt_id)
-    console.print(f"[green]Deleted user override for {prompt_id!r}.[/green]")
+    store = PromptStore()
+    was_override = store.is_default(prompt_id)
+    store.delete(prompt_id)
+    if was_override:
+        console.print(
+            f"[green]Removed override; {prompt_id!r} reverted to its packaged default.[/green]"
+        )
+    else:
+        console.print(f"[green]Deleted prompt {prompt_id!r}.[/green]")
 
 
 # --- dictionary ------------------------------------------------------------

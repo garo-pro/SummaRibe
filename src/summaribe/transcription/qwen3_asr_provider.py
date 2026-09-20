@@ -40,6 +40,8 @@ class Qwen3ASRProvider(TranscriptionProvider):
 
     def is_available(self) -> bool:
         try:
+            import soundfile  # noqa: F401
+            import torch  # noqa: F401
             import transformers  # noqa: F401
         except ImportError:
             return False
@@ -52,7 +54,7 @@ class Qwen3ASRProvider(TranscriptionProvider):
             from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
         except ImportError as exc:
             raise ProviderUnavailableError(
-                "transformers/torch are not installed. Install the 'qwen' extra: "
+                "transformers/torch/soundfile are not installed. Install the 'qwen' extra: "
                 "uv sync --extra qwen"
             ) from exc
         try:
@@ -81,10 +83,9 @@ class Qwen3ASRProvider(TranscriptionProvider):
             import soundfile as sf
 
             audio, sample_rate = sf.read(str(audio_path))
-            inputs = self._processor(
-                audio, sampling_rate=sample_rate, return_tensors="pt", language=language
-            )
-            generated_ids = self._model.generate(**inputs)
+            inputs = self._processor(audio, sampling_rate=sample_rate, return_tensors="pt")
+            generate_kwargs = {"language": language} if language else {}
+            generated_ids = self._model.generate(**inputs, **generate_kwargs)
             text = self._processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         except Exception as exc:
             raise TranscriptionError(f"Qwen3-ASR transcription failed: {exc}") from exc

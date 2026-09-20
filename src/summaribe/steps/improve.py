@@ -16,7 +16,11 @@ class ImproveStep(PipelineStep):
         self, context: PipelineContext, on_progress: ProgressCallback | None = None
     ) -> PipelineContext:
         ai_settings = context.settings.ai
-        client = ProviderStore().client_for(ai_settings.improve_provider_id)
+        client = ProviderStore().client_for(
+            ai_settings.improve_provider_id,
+            stream=ai_settings.streaming,
+            timeout_seconds=ai_settings.timeout_seconds,
+        )
         prompt = PromptStore().get(ai_settings.improve_prompt_id)
 
         def _on_token(token: str) -> None:

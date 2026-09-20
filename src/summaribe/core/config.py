@@ -31,7 +31,7 @@ class AISettings(BaseModel):
     improve_prompt_id: str = "improve_default"
     summarize_provider_id: str = "ollama"
     summarize_prompt_id: str = "summarize_default"
-    streaming: bool = True
+    streaming: bool = False  # matches the shipped providers' own `stream: false` default
     timeout_seconds: float = 120.0
     temperature: float = 0.3
     max_tokens: int = 2048
@@ -55,7 +55,6 @@ class AppSettings(BaseModel):
     audio_quality_kbps: int = 192
     keep_intermediate_files: bool = True
     output_formats: list[OutputFormat] = Field(default_factory=_default_output_formats)
-    max_workers: int = 1
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     transcription: TranscriptionSettings = Field(default_factory=TranscriptionSettings)

@@ -35,6 +35,7 @@ class DownloadStep(PipelineStep):
         ydl_opts = {
             "format": "bestaudio/best",
             "outtmpl": output_template,
+            "noplaylist": True,
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
