@@ -4,32 +4,15 @@ Turn a URL (or a local file) into a clean transcript and a summary:
 
 **download audio → transcribe → AI-improve the transcript → AI-summarize it**
 
-Every step is its own module, runnable standalone or chained together, from either
-a wxPython desktop GUI or a CLI. Transcription backends (Whisper, Parakeet-TDT,
-Qwen3-ASR, or your own model) and AI providers (Ollama, llama.cpp, Anthropic,
-OpenAI, OpenRouter, or your own HTTP endpoint) are all pluggable through JSON
-config, no code changes required.
+Every step is its own module, runnable standalone or chained together, from either a wxPython desktop GUI or a CLI. Transcription backends (Whisper, Parakeet-TDT, Qwen3-ASR, or your own model) and AI providers (Ollama, llama.cpp, Anthropic, OpenAI, OpenRouter, or your own HTTP endpoint) are all pluggable through JSON config, no code changes required.
 
 ## Features
 
-- **Chainable pipeline** - `download`, `transcribe`, `improve`, `summarize` are
-  independent steps. Run all four in order, or run any one of them by itself
-  against an existing file.
-- **Pluggable transcription** - Whisper (via faster-whisper), NVIDIA Parakeet-TDT
-  (via NeMo), and Qwen3-ASR (via Transformers) ship built in. Point any of them at
-  a local checkpoint instead of a named model to use a fine-tuned or custom model
-  that shares the same architecture.
-- **Template-driven AI providers** - talking to a chat-completion API (local or
-  cloud) is described entirely in JSON: base URL, endpoint, headers, request body
-  template, and where to find the reply in the response. Ollama, llama.cpp,
-  Anthropic, OpenAI, and OpenRouter ship as defaults; add your own by writing (or
-  editing in the GUI) another JSON file. A provider can also optionally describe
-  a models-listing endpoint, which lights up a "Fetch models" picker in Settings.
-- **Editable system prompts** - separate prompt libraries for transcript cleanup
-  and summarization, with sensible defaults included and full GUI/CLI editing.
-- **Optional dictionary filter** - user-defined find/replace rules for words your
-  transcription model consistently gets wrong (jargon, names, acronyms). Ships
-  with zero entries; it's purely something you build up yourself.
+- **Chainable pipeline** - `download`, `transcribe`, `improve`, `summarize` are independent steps. Run all four in order, or run any one of them by itself against an existing file.
+- **Pluggable transcription** - Whisper (via faster-whisper), NVIDIA Parakeet-TDT (via NeMo), and Qwen3-ASR (via Transformers) ship built in. Point any of them at a local checkpoint instead of a named model to use a fine-tuned or custom model that shares the same architecture.
+- **Template-driven AI providers** - talking to a chat-completion API (local or cloud) is described entirely in JSON: base URL, endpoint, headers, request body template, and where to find the reply in the response. Ollama, llama.cpp, Anthropic, OpenAI, and OpenRouter ship as defaults; add your own by writing (or editing in the GUI) another JSON file. A provider can also optionally describe a models-listing endpoint, which lights up a "Fetch models" picker in Settings.
+- **Editable system prompts** - separate prompt libraries for transcript cleanup and summarization, with sensible defaults included and full GUI/CLI editing.
+- **Optional dictionary filter** - user-defined find/replace rules for words your transcription model consistently gets wrong (jargon, names, acronyms). Ships with zero entries; it's purely something you build up yourself.
 - **wxPython GUI and a full CLI** - the same core pipeline backs both.
 
 ## Install
@@ -55,8 +38,7 @@ Audio extraction requires `ffmpeg` on your `PATH`.
 uv run summaribe gui
 ```
 
-Tabs: **Pipeline** (run steps against a URL or file), **Providers**, **Prompts**,
-**Dictionary**, and **Settings**.
+Tabs: **Pipeline** (run steps against a URL or file), **Providers**, **Prompts**, **Dictionary**, and **Settings**.
 
 ### CLI
 
@@ -79,10 +61,7 @@ uv run summaribe run "https://example.com/watch?v=..." --steps download,transcri
 uv run summaribe run --file ./out/abc123.mp3 --steps transcribe,improve,summarize
 ```
 
-`run` writes whichever of `transcript.raw.txt` / `transcript.improved.txt` /
-`summary.md` / `transcript.srt` / `transcript.vtt` / `result.json` are relevant,
-based on `settings.output_formats` (`srt`/`vtt` need segment timings, which not
-every transcription provider produces).
+`run` writes whichever of `transcript.raw.txt` / `transcript.improved.txt` / `summary.md` / `transcript.srt` / `transcript.vtt` / `result.json` are relevant, based on `settings.output_formats` (`srt`/`vtt` need segment timings, which not every transcription provider produces).
 
 Manage providers, prompts, dictionaries, and settings:
 
@@ -97,11 +76,7 @@ uv run summaribe settings show
 
 ## Configuring an AI provider
 
-A provider is one JSON file (see `src/summaribe/data/providers/*.json` for the
-shipped defaults). The request body is a *template*: `"{{name}}"` is replaced
-with a variable, and a string that is *only* a placeholder (e.g.
-`"messages": "{{messages}}"`) is replaced with the raw value (a list, bool,
-number, ...) rather than stringified, so structured data can be spliced in.
+A provider is one JSON file (see `src/summaribe/data/providers/*.json` for the shipped defaults). The request body is a *template*: `"{{name}}"` is replaced with a variable, and a string that is *only* a placeholder (e.g. `"messages": "{{messages}}"`) is replaced with the raw value (a list, bool, number, ...) rather than stringified, so structured data can be spliced in.
 
 ```json
 {
@@ -126,21 +101,13 @@ number, ...) rather than stringified, so structured data can be spliced in.
 }
 ```
 
-`response_path` / `stream_delta_path` are dotted paths (numeric segments index
-into lists) used to pull the reply text out of the JSON response. For an API
-key, set `api_key_env` to the name of an environment variable; its value is
-exposed to templates as `{{api_key}}` (used inside `headers`, typically).
+`response_path` / `stream_delta_path` are dotted paths (numeric segments index into lists) used to pull the reply text out of the JSON response. For an API key, set `api_key_env` to the name of an environment variable; its value is exposed to templates as `{{api_key}}` (used inside `headers`, typically).
 
-Providers, prompts, and dictionaries are stored as **packaged defaults +
-user overrides**: editing a default in the GUI/CLI saves your version into your
-user config directory without touching the installed package; deleting a user
-override reverts to the shipped default.
+Providers, prompts, and dictionaries are stored as **packaged defaults + user overrides**: editing a default in the GUI/CLI saves your version into your user config directory without touching the installed package; deleting a user override reverts to the shipped default.
 
 ### Listing available models
 
-A provider can optionally describe how to list its available models, via an
-`"models"` field that's either absent/`null` (no such endpoint - the model
-picker UI just doesn't appear for that provider) or an object like:
+A provider can optionally describe how to list its available models, via a `"models"` field that's either absent/`null` (no such endpoint - the model picker UI just doesn't appear for that provider) or an object like:
 
 ```json
 "models": {
@@ -151,27 +118,21 @@ picker UI just doesn't appear for that provider) or an object like:
 }
 ```
 
-`response_list_path` is a dotted path to the array of model objects in the
-response; `model_id_path` is a dotted path *within each item* to its id. This
-is enough to describe every provider shipped by default:
+`response_list_path` is a dotted path to the array of model objects in the response; `model_id_path` is a dotted path *within each item* to its id. This is enough to describe every provider shipped by default:
 
-| Provider   | Endpoint       | `response_list_path` | `model_id_path` |
-|------------|----------------|-----------------------|------------------|
-| Ollama     | `/api/tags`    | `models`              | `model`          |
-| llama.cpp  | `/v1/models`   | `data`                | `id`             |
-| Anthropic  | `/v1/models`   | `data`                | `id`             |
-| OpenAI     | `/v1/models`   | `data`                | `id`             |
-| OpenRouter | `/v1/models`   | `data`                | `id`             |
+| Provider   | Endpoint     | `response_list_path` | `model_id_path` |
+|------------|--------------|-----------------------|------------------|
+| Ollama     | `/api/tags`  | `models`              | `model`          |
+| llama.cpp  | `/v1/models` | `data`                | `id`             |
+| Anthropic  | `/v1/models` | `data`                | `id`             |
+| OpenAI     | `/v1/models` | `data`                | `id`             |
+| OpenRouter | `/v1/models` | `data`                | `id`             |
 
 ```bash
 uv run summaribe providers models ollama
 ```
 
-In the GUI's **Settings** tab, the improve/summarize "Model" fields have a
-*Fetch models* button next to them that calls this endpoint and lets you pick
-from what the provider actually has available, instead of typing a model id
-from memory. Leaving the model field blank falls back to the provider's own
-`variables.model` default.
+In the GUI's **Settings** tab, the improve/summarize "Model" fields have a *Fetch models* button next to them that calls this endpoint and lets you pick from what the provider actually has available, instead of typing a model id from memory. Leaving the model field blank falls back to the provider's own `variables.model` default.
 
 ## Architecture
 
@@ -187,11 +148,7 @@ src/summaribe/
   cli.py           Typer CLI: one subcommand per step, plus `run` to chain them
 ```
 
-A `PipelineStep` declares the context fields it `requires` and `produces`.
-Calling a step directly validates its inputs and runs it standalone; a
-`Pipeline` just calls a list of steps against one shared context in order.
-This is what makes every step independently runnable *and* chainable without
-two separate code paths.
+A `PipelineStep` declares the context fields it `requires` and `produces`. Calling a step directly validates its inputs and runs it standalone; a `Pipeline` just calls a list of steps against one shared context in order. This is what makes every step independently runnable *and* chainable without two separate code paths.
 
 ## Development
 
