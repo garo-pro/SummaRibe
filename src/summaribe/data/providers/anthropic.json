@@ -30,5 +30,11 @@
     "model": "claude-sonnet-5",
     "temperature": 0.3,
     "max_tokens": 2048
+  },
+  "models": {
+    "endpoint": "/v1/models",
+    "method": "GET",
+    "response_list_path": "data",
+    "model_id_path": "id"
   }
 }

@@ -7,8 +7,8 @@ Turn a URL (or a local file) into a clean transcript and a summary:
 Every step is its own module, runnable standalone or chained together, from either
 a wxPython desktop GUI or a CLI. Transcription backends (Whisper, Parakeet-TDT,
 Qwen3-ASR, or your own model) and AI providers (Ollama, llama.cpp, Anthropic,
-OpenRouter, or your own HTTP endpoint) are all pluggable through JSON config, no
-code changes required.
+OpenAI, OpenRouter, or your own HTTP endpoint) are all pluggable through JSON
+config, no code changes required.
 
 ## Features
 
@@ -22,8 +22,9 @@ code changes required.
 - **Template-driven AI providers** - talking to a chat-completion API (local or
   cloud) is described entirely in JSON: base URL, endpoint, headers, request body
   template, and where to find the reply in the response. Ollama, llama.cpp,
-  Anthropic, and OpenRouter ship as defaults; add your own by writing (or editing
-  in the GUI) another JSON file.
+  Anthropic, OpenAI, and OpenRouter ship as defaults; add your own by writing (or
+  editing in the GUI) another JSON file. A provider can also optionally describe
+  a models-listing endpoint, which lights up a "Fetch models" picker in Settings.
 - **Editable system prompts** - separate prompt libraries for transcript cleanup
   and summarization, with sensible defaults included and full GUI/CLI editing.
 - **Optional dictionary filter** - user-defined find/replace rules for words your
@@ -134,6 +135,43 @@ Providers, prompts, and dictionaries are stored as **packaged defaults +
 user overrides**: editing a default in the GUI/CLI saves your version into your
 user config directory without touching the installed package; deleting a user
 override reverts to the shipped default.
+
+### Listing available models
+
+A provider can optionally describe how to list its available models, via an
+`"models"` field that's either absent/`null` (no such endpoint - the model
+picker UI just doesn't appear for that provider) or an object like:
+
+```json
+"models": {
+  "endpoint": "/v1/models",
+  "method": "GET",
+  "response_list_path": "data",
+  "model_id_path": "id"
+}
+```
+
+`response_list_path` is a dotted path to the array of model objects in the
+response; `model_id_path` is a dotted path *within each item* to its id. This
+is enough to describe every provider shipped by default:
+
+| Provider   | Endpoint       | `response_list_path` | `model_id_path` |
+|------------|----------------|-----------------------|------------------|
+| Ollama     | `/api/tags`    | `models`              | `model`          |
+| llama.cpp  | `/v1/models`   | `data`                | `id`             |
+| Anthropic  | `/v1/models`   | `data`                | `id`             |
+| OpenAI     | `/v1/models`   | `data`                | `id`             |
+| OpenRouter | `/v1/models`   | `data`                | `id`             |
+
+```bash
+uv run summaribe providers models ollama
+```
+
+In the GUI's **Settings** tab, the improve/summarize "Model" fields have a
+*Fetch models* button next to them that calls this endpoint and lets you pick
+from what the provider actually has available, instead of typing a model id
+from memory. Leaving the model field blank falls back to the provider's own
+`variables.model` default.
 
 ## Architecture
 

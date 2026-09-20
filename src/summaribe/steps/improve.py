@@ -28,13 +28,16 @@ class ImproveStep(PipelineStep):
                 on_progress(self.name, token)
 
         assert context.transcript_raw is not None  # guaranteed by `requires`
+        extra_variables: dict[str, object] = {
+            "temperature": ai_settings.temperature,
+            "max_tokens": ai_settings.max_tokens,
+        }
+        if ai_settings.improve_model:
+            extra_variables["model"] = ai_settings.improve_model
         result = client.complete(
             system_prompt=prompt.content,
             user_prompt=context.transcript_raw,
-            extra_variables={
-                "temperature": ai_settings.temperature,
-                "max_tokens": ai_settings.max_tokens,
-            },
+            extra_variables=extra_variables,
             on_token=_on_token,
         )
         context.transcript_improved = result.strip()

@@ -103,6 +103,9 @@ def improve(
     out: Annotated[Path | None, typer.Option()] = None,
     provider: Annotated[str | None, typer.Option(help="AI provider id.")] = None,
     prompt: Annotated[str | None, typer.Option(help="System prompt id.")] = None,
+    model: Annotated[
+        str | None, typer.Option(help="Override the provider's default model.")
+    ] = None,
 ) -> None:
     """Run the AI transcript-cleanup pass on an existing transcript file."""
     context = _load_context(transcript_path.parent)
@@ -111,6 +114,8 @@ def improve(
         context.settings.ai.improve_provider_id = provider
     if prompt:
         context.settings.ai.improve_prompt_id = prompt
+    if model:
+        context.settings.ai.improve_model = model
     context = ImproveStep()(context, on_progress=_progress_printer)
     _write_text(out, context.transcript_improved or "")
 
@@ -121,6 +126,9 @@ def summarize(
     out: Annotated[Path | None, typer.Option()] = None,
     provider: Annotated[str | None, typer.Option(help="AI provider id.")] = None,
     prompt: Annotated[str | None, typer.Option(help="System prompt id.")] = None,
+    model: Annotated[
+        str | None, typer.Option(help="Override the provider's default model.")
+    ] = None,
 ) -> None:
     """Summarize an existing (ideally already-improved) transcript file."""
     context = _load_context(transcript_path.parent)
@@ -129,6 +137,8 @@ def summarize(
         context.settings.ai.summarize_provider_id = provider
     if prompt:
         context.settings.ai.summarize_prompt_id = prompt
+    if model:
+        context.settings.ai.summarize_model = model
     context = SummarizeStep()(context, on_progress=_progress_printer)
     _write_text(out, context.summary or "")
 
@@ -241,6 +251,20 @@ def providers_list() -> None:
 def providers_show(provider_id: str) -> None:
     provider = ProviderStore().get(provider_id)
     console.print_json(provider.model_dump_json())
+
+
+@providers_app.command("models")
+def providers_models(provider_id: str) -> None:
+    """List the models a provider reports as available (requires its `models` config)."""
+    store = ProviderStore()
+    config = store.get(provider_id)
+    if config.models is None:
+        console.print(
+            f"[yellow]Provider {provider_id!r} has no models listing endpoint configured.[/yellow]"
+        )
+        raise typer.Exit(code=1)
+    for model_id in store.client_for(provider_id).list_models():
+        console.print(model_id)
 
 
 @providers_app.command("import")

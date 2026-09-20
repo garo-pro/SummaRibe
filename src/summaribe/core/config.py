@@ -29,8 +29,10 @@ class TranscriptionSettings(BaseModel):
 class AISettings(BaseModel):
     improve_provider_id: str = "ollama"
     improve_prompt_id: str = "improve_default"
+    improve_model: str | None = None  # None = use the provider's own default `variables.model`
     summarize_provider_id: str = "ollama"
     summarize_prompt_id: str = "summarize_default"
+    summarize_model: str | None = None
     streaming: bool = False  # matches the shipped providers' own `stream: false` default
     timeout_seconds: float = 120.0
     temperature: float = 0.3

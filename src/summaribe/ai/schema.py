@@ -11,9 +11,37 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from summaribe.core.layered_store import IdentifiedModel
+
+
+class ModelsListConfig(BaseModel):
+    """Optional description of how to list the models this provider has available.
+
+    Left unset (the default) when a provider has no such endpoint, or the user
+    hasn't bothered to describe one - the model list UI simply doesn't appear.
+    """
+
+    endpoint: str = Field(..., description="Path appended to base_url, e.g. '/v1/models'.")
+    method: Literal["GET", "POST"] = "GET"
+    request_body: dict[str, Any] | None = Field(
+        default=None,
+        description="JSON body template for POST-based listing; rendered like request_template.",
+    )
+    response_list_path: str = Field(
+        default="data",
+        description="Dotted path to the array of model objects in the response JSON.",
+    )
+    model_id_path: str = Field(
+        default="id",
+        description="Dotted path, within each item of that array, to the model's id/name.",
+    )
+
+    @field_validator("endpoint")
+    @classmethod
+    def _leading_slash(cls, value: str) -> str:
+        return value if value.startswith("/") else f"/{value}"
 
 
 class ProviderConfig(IdentifiedModel):
@@ -59,6 +87,11 @@ class ProviderConfig(IdentifiedModel):
         description="Default template variables (model, temperature, max_tokens, ...).",
     )
 
+    models: ModelsListConfig | None = Field(
+        default=None,
+        description="How to list this provider's available models, if it has such an endpoint.",
+    )
+
     @field_validator("base_url")
     @classmethod
     def _strip_trailing_slash(cls, value: str) -> str:
@@ -72,3 +105,9 @@ class ProviderConfig(IdentifiedModel):
     @property
     def url(self) -> str:
         return f"{self.base_url}{self.endpoint}"
+
+    @property
+    def models_url(self) -> str | None:
+        if self.models is None:
+            return None
+        return f"{self.base_url}{self.models.endpoint}"

@@ -131,6 +131,65 @@ def test_missing_api_key_env_raises_config_error():
         client.complete(system_prompt="s", user_prompt="u")
 
 
+def test_list_models_extracts_ids_from_nested_array():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/models"
+        return httpx.Response(200, json={"data": [{"id": "model-a"}, {"id": "model-b"}]})
+
+    config = _openai_style_config(
+        models={
+            "endpoint": "/v1/models",
+            "method": "GET",
+            "response_list_path": "data",
+            "model_id_path": "id",
+        }
+    )
+    client = AIClient(config)
+    models = client.list_models(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert models == ["model-a", "model-b"]
+
+
+def test_list_models_supports_ollama_shaped_response():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/tags"
+        return httpx.Response(
+            200, json={"models": [{"name": "llama3:latest", "model": "llama3:latest"}]}
+        )
+
+    config = _openai_style_config(
+        models={
+            "endpoint": "/api/tags",
+            "method": "GET",
+            "response_list_path": "models",
+            "model_id_path": "model",
+        }
+    )
+    client = AIClient(config)
+    models = client.list_models(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert models == ["llama3:latest"]
+
+
+def test_list_models_without_config_raises_config_error():
+    client = AIClient(_openai_style_config())
+    with pytest.raises(ConfigError):
+        client.list_models()
+
+
+def test_list_models_sends_provider_auth_headers():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer secret-key"
+        return httpx.Response(200, json={"data": []})
+
+    config = _openai_style_config(
+        api_key_env="MY_KEY",
+        headers={"Authorization": "Bearer {{api_key}}"},
+        models={"endpoint": "/v1/models", "response_list_path": "data", "model_id_path": "id"},
+    )
+    client = AIClient(config, env={"MY_KEY": "secret-key"})
+    models = client.list_models(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert models == []
+
+
 def test_api_key_is_available_to_header_template():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer secret-key"

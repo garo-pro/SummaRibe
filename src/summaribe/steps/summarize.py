@@ -40,13 +40,16 @@ class SummarizeStep(PipelineStep):
             if on_progress is not None:
                 on_progress(self.name, token)
 
+        extra_variables: dict[str, object] = {
+            "temperature": ai_settings.temperature,
+            "max_tokens": ai_settings.max_tokens,
+        }
+        if ai_settings.summarize_model:
+            extra_variables["model"] = ai_settings.summarize_model
         result = client.complete(
             system_prompt=prompt.content,
             user_prompt=source_text,
-            extra_variables={
-                "temperature": ai_settings.temperature,
-                "max_tokens": ai_settings.max_tokens,
-            },
+            extra_variables=extra_variables,
             on_token=_on_token,
         )
         context.summary = result.strip()

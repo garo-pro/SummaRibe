@@ -73,6 +73,30 @@ def test_run_chains_from_local_transcript_file(monkeypatch, tmp_path: Path):
     assert (tmp_path / "summary.md").read_text(encoding="utf-8") == "cleaned"
 
 
+def test_providers_models_lists_ids(monkeypatch):
+    from summaribe.ai.provider import AIClient
+
+    monkeypatch.setattr(AIClient, "list_models", lambda self, **kwargs: ["model-a", "model-b"])
+
+    result = runner.invoke(app, ["providers", "models", "ollama"])
+    assert result.exit_code == 0
+    assert "model-a" in result.stdout
+    assert "model-b" in result.stdout
+
+
+def test_providers_models_errors_without_models_config():
+    from summaribe.ai.registry import ProviderStore
+
+    store = ProviderStore()
+    provider_without_models = store.get("ollama").model_copy(
+        update={"id": "no-models", "models": None}
+    )
+    store.save(provider_without_models)
+
+    result = runner.invoke(app, ["providers", "models", "no-models"])
+    assert result.exit_code != 0
+
+
 def test_improve_step_uses_ai_provider(monkeypatch, tmp_path: Path):
     transcript_path = tmp_path / "transcript.txt"
     transcript_path.write_text("raw text", encoding="utf-8")

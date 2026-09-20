@@ -8,9 +8,15 @@ from summaribe.core.exceptions import ConfigError, RegistryError
 def test_provider_store_lists_packaged_defaults():
     store = ProviderStore()
     ids = {p.id for p in store.list()}
-    assert {"ollama", "llamacpp", "anthropic", "openrouter"} <= ids
+    assert {"ollama", "llamacpp", "anthropic", "openrouter", "openai"} <= ids
     for provider_id in ids:
         assert store.is_default(provider_id)
+
+
+def test_all_packaged_providers_have_a_models_listing_configured():
+    for provider in ProviderStore().list():
+        assert provider.models is not None, f"{provider.id} should ship a models endpoint"
+        assert provider.models_url is not None
 
 
 def test_provider_store_user_override_shadows_default():

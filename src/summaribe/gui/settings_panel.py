@@ -99,10 +99,37 @@ class SettingsPanel(wx.Panel):
         self.timeout_ctrl = wx.SpinCtrlDouble(ai_parent, min=1, max=3600, inc=1)
         self.temperature_ctrl = wx.SpinCtrlDouble(ai_parent, min=0, max=2, inc=0.1)
         self.max_tokens_ctrl = wx.SpinCtrl(ai_parent, min=1, max=200_000)
+
+        self.improve_model_ctrl = wx.ComboBox(ai_parent, style=wx.CB_DROPDOWN)
+        self.improve_model_ctrl.SetHint("blank = provider's own default")
+        improve_fetch_btn = wx.Button(ai_parent, label="Fetch models")
+        improve_fetch_btn.Bind(
+            wx.EVT_BUTTON,
+            lambda evt: self._on_fetch_models(self.improve_provider_ctrl, self.improve_model_ctrl),
+        )
+        improve_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        improve_model_row.Add(self.improve_model_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
+        improve_model_row.Add(improve_fetch_btn, 0)
+
+        self.summarize_model_ctrl = wx.ComboBox(ai_parent, style=wx.CB_DROPDOWN)
+        self.summarize_model_ctrl.SetHint("blank = provider's own default")
+        summarize_fetch_btn = wx.Button(ai_parent, label="Fetch models")
+        summarize_fetch_btn.Bind(
+            wx.EVT_BUTTON,
+            lambda evt: self._on_fetch_models(
+                self.summarize_provider_ctrl, self.summarize_model_ctrl
+            ),
+        )
+        summarize_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        summarize_model_row.Add(self.summarize_model_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
+        summarize_model_row.Add(summarize_fetch_btn, 0)
+
         for label, ctrl in [
             ("Improve provider", self.improve_provider_ctrl),
+            ("Improve model", improve_model_row),
             ("Improve prompt", self.improve_prompt_ctrl),
             ("Summarize provider", self.summarize_provider_ctrl),
+            ("Summarize model", summarize_model_row),
             ("Summarize prompt", self.summarize_prompt_ctrl),
             ("Streaming", self.streaming_ctrl),
             ("Timeout (s)", self.timeout_ctrl),
@@ -168,8 +195,10 @@ class SettingsPanel(wx.Panel):
 
         a = settings.ai
         self.improve_provider_ctrl.SetStringSelection(a.improve_provider_id)
+        self.improve_model_ctrl.SetValue(a.improve_model or "")
         self.improve_prompt_ctrl.SetStringSelection(a.improve_prompt_id)
         self.summarize_provider_ctrl.SetStringSelection(a.summarize_provider_id)
+        self.summarize_model_ctrl.SetValue(a.summarize_model or "")
         self.summarize_prompt_ctrl.SetStringSelection(a.summarize_prompt_id)
         self.streaming_ctrl.SetValue(a.streaming)
         self.timeout_ctrl.SetValue(a.timeout_seconds)
@@ -217,12 +246,14 @@ class SettingsPanel(wx.Panel):
         settings.ai.improve_provider_id = (
             self.improve_provider_ctrl.GetStringSelection() or settings.ai.improve_provider_id
         )
+        settings.ai.improve_model = self.improve_model_ctrl.GetValue().strip() or None
         settings.ai.improve_prompt_id = (
             self.improve_prompt_ctrl.GetStringSelection() or settings.ai.improve_prompt_id
         )
         settings.ai.summarize_provider_id = (
             self.summarize_provider_ctrl.GetStringSelection() or settings.ai.summarize_provider_id
         )
+        settings.ai.summarize_model = self.summarize_model_ctrl.GetValue().strip() or None
         settings.ai.summarize_prompt_id = (
             self.summarize_prompt_ctrl.GetStringSelection() or settings.ai.summarize_prompt_id
         )
@@ -243,3 +274,26 @@ class SettingsPanel(wx.Panel):
 
         self.settings_manager.save(settings)
         wx.MessageBox("Settings saved.", "SummaRibe")
+
+    def _on_fetch_models(self, provider_ctrl: wx.Choice, model_ctrl: wx.ComboBox) -> None:
+        provider_id = provider_ctrl.GetStringSelection()
+        if not provider_id:
+            wx.MessageBox("Choose a provider first.", "SummaRibe", wx.ICON_WARNING)
+            return
+        store = ProviderStore()
+        config = store.get(provider_id)
+        if config.models is None:
+            wx.MessageBox(
+                f"Provider {provider_id!r} has no models listing endpoint configured.",
+                "SummaRibe",
+                wx.ICON_INFORMATION,
+            )
+            return
+        try:
+            model_ids = store.client_for(provider_id).list_models()
+        except Exception as exc:
+            wx.MessageBox(f"Could not fetch models: {exc}", "SummaRibe", wx.ICON_ERROR)
+            return
+        current = model_ctrl.GetValue()
+        model_ctrl.Set(model_ids)
+        model_ctrl.SetValue(current)

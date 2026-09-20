@@ -90,6 +90,51 @@ class AIClient:
             if owns_client:
                 http_client.close()
 
+    def list_models(
+        self, *, client: httpx.Client | None = None, timeout_seconds: float = 10.0
+    ) -> list[str]:
+        """Fetch the provider's available model ids via its `models` config.
+
+        Raises `ConfigError` if the provider has no `models` endpoint configured.
+        Uses a short default timeout independent of `config.timeout_seconds`,
+        since this is typically an interactive "let me pick a model" UI action.
+        """
+        models_cfg = self.config.models
+        if models_cfg is None:
+            raise ConfigError(
+                f"Provider {self.config.id!r} has no models listing endpoint configured."
+            )
+
+        variables = self._build_variables({})
+        headers = render(self.config.headers, variables) if self.config.headers else {}
+        url = f"{self.config.base_url}{models_cfg.endpoint}"
+        payload = (
+            render(models_cfg.request_body, variables)
+            if models_cfg.request_body is not None
+            else None
+        )
+
+        owns_client = client is None
+        http_client = client or httpx.Client(timeout=timeout_seconds)
+        try:
+            response = http_client.request(models_cfg.method, url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            items = extract(data, models_cfg.response_list_path)
+            if not isinstance(items, list):
+                raise AIProviderError(
+                    f"Provider {self.config.id!r}: response_list_path "
+                    f"{models_cfg.response_list_path!r} did not resolve to a list."
+                )
+            return [str(extract(item, models_cfg.model_id_path)) for item in items]
+        except httpx.HTTPError as exc:
+            raise AIProviderError(
+                f"Listing models for provider {self.config.id!r} failed: {exc}"
+            ) from exc
+        finally:
+            if owns_client:
+                http_client.close()
+
     def _complete_once(
         self, client: httpx.Client, payload: dict[str, Any], headers: dict[str, str]
     ) -> str:

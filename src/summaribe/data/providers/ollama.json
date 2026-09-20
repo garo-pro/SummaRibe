@@ -27,5 +27,11 @@
     "model": "llama3.1",
     "temperature": 0.3,
     "max_tokens": 2048
+  },
+  "models": {
+    "endpoint": "/api/tags",
+    "method": "GET",
+    "response_list_path": "models",
+    "model_id_path": "model"
   }
 }
