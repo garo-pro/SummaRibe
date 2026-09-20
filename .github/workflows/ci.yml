@@ -77,3 +77,5 @@ jobs:
           frame.Destroy()
           print('GUI construction OK')
           "
+      - name: Check every control is labelled for screen readers
+        run: uv run pytest tests/test_gui_accessibility.py -v

@@ -8,6 +8,7 @@ from summaribe.ai.prompts import PromptStore
 from summaribe.ai.registry import ProviderStore
 from summaribe.core.config import AppSettings, OutputFormat, SettingsManager
 from summaribe.dictionary.filter import DictionaryStore
+from summaribe.gui.accessibility import add_labelled, describe
 from summaribe.transcription.registry import list_provider_classes
 
 _AUDIO_FORMATS = ["mp3", "wav", "flac", "m4a"]
@@ -27,6 +28,7 @@ class SettingsPanel(wx.Panel):
         outer = wx.BoxSizer(wx.VERTICAL)
         scroller = wx.ScrolledWindow(self)
         scroller.SetScrollRate(0, 12)
+        describe(scroller, "Settings", "Scroll for more settings groups.")
         root = wx.BoxSizer(wx.VERTICAL)
 
         # General
@@ -34,22 +36,44 @@ class SettingsPanel(wx.Panel):
         general_parent = general.GetStaticBox()
         grid = wx.FlexGridSizer(cols=2, gap=(6, 6))
         grid.AddGrowableCol(1, 1)
-        self.work_dir_ctrl = wx.DirPickerCtrl(general_parent)
-        self.audio_format_ctrl = wx.Choice(general_parent, choices=_AUDIO_FORMATS)
-        self.audio_quality_ctrl = wx.SpinCtrl(general_parent, min=32, max=320)
-        self.keep_intermediate_ctrl = wx.CheckBox(general_parent)
-        self.output_formats_ctrl = wx.CheckListBox(general_parent, choices=_OUTPUT_FORMATS)
-        self.log_level_ctrl = wx.Choice(general_parent, choices=_LOG_LEVELS)
-        for label, ctrl in [
-            ("Working directory", self.work_dir_ctrl),
-            ("Audio format", self.audio_format_ctrl),
-            ("Audio quality (kbps)", self.audio_quality_ctrl),
-            ("Keep intermediate files", self.keep_intermediate_ctrl),
-            ("Output formats", self.output_formats_ctrl),
-            ("Log level", self.log_level_ctrl),
-        ]:
-            grid.Add(wx.StaticText(general_parent, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
-            grid.Add(ctrl, 1, wx.EXPAND)
+        self.work_dir_ctrl = add_labelled(
+            grid,
+            general_parent,
+            "Working directory",
+            wx.DirPickerCtrl,
+            "Where downloads, transcripts and summaries are written.",
+        )
+        self.audio_format_ctrl = add_labelled(
+            grid,
+            general_parent,
+            "Audio format",
+            lambda p: wx.Choice(p, choices=_AUDIO_FORMATS),
+            "Container the downloaded audio is converted to.",
+        )
+        self.audio_quality_ctrl = add_labelled(
+            grid,
+            general_parent,
+            "Audio quality (kbps)",
+            lambda p: wx.SpinCtrl(p, min=32, max=320),
+            "Bitrate between 32 and 320 kbps.",
+        )
+        self.keep_intermediate_ctrl = add_labelled(
+            grid,
+            general_parent,
+            "Keep intermediate files",
+            wx.CheckBox,
+            "Leave the downloaded audio and raw transcript on disk after a run.",
+        )
+        self.output_formats_ctrl = add_labelled(
+            grid,
+            general_parent,
+            "Output formats",
+            lambda p: wx.CheckListBox(p, choices=_OUTPUT_FORMATS),
+            "Check every format the transcript should be written in.",
+        )
+        self.log_level_ctrl = add_labelled(
+            grid, general_parent, "Log level", lambda p: wx.Choice(p, choices=_LOG_LEVELS)
+        )
         general.Add(grid, 0, wx.EXPAND | wx.ALL, 8)
         root.Add(general, 0, wx.EXPAND | wx.ALL, 8)
 
@@ -59,27 +83,48 @@ class SettingsPanel(wx.Panel):
         t_grid = wx.FlexGridSizer(cols=2, gap=(6, 6))
         t_grid.AddGrowableCol(1, 1)
         provider_ids = [cls.id for cls in list_provider_classes()]
-        self.transcription_provider_ctrl = wx.Choice(transcription_parent, choices=provider_ids)
-        self.transcription_model_ctrl = wx.TextCtrl(transcription_parent)
-        self.transcription_model_path_ctrl = wx.FilePickerCtrl(transcription_parent)
-        self.transcription_device_ctrl = wx.Choice(
-            transcription_parent, choices=["auto", "cpu", "cuda"]
+        self.transcription_provider_ctrl = add_labelled(
+            t_grid,
+            transcription_parent,
+            "Transcription provider",
+            lambda p: wx.Choice(p, choices=provider_ids),
+            "Speech-to-text backend used by the transcribe step.",
         )
-        self.transcription_compute_type_ctrl = wx.TextCtrl(transcription_parent)
-        self.transcription_language_ctrl = wx.TextCtrl(transcription_parent)
+        self.transcription_model_ctrl = add_labelled(
+            t_grid,
+            transcription_parent,
+            "Transcription model (name or size)",
+            wx.TextCtrl,
+            "For example 'large-v3' for Whisper.",
+        )
+        self.transcription_model_path_ctrl = add_labelled(
+            t_grid,
+            transcription_parent,
+            "Custom transcription model path",
+            wx.FilePickerCtrl,
+            "Optional. Overrides the model name with a file on disk.",
+        )
+        self.transcription_device_ctrl = add_labelled(
+            t_grid,
+            transcription_parent,
+            "Transcription device",
+            lambda p: wx.Choice(p, choices=["auto", "cpu", "cuda"]),
+        )
+        self.transcription_compute_type_ctrl = add_labelled(
+            t_grid,
+            transcription_parent,
+            "Compute type",
+            wx.TextCtrl,
+            "Backend-specific precision, for example 'float16' or 'int8'.",
+        )
+        self.transcription_language_ctrl = add_labelled(
+            t_grid,
+            transcription_parent,
+            "Transcription language",
+            wx.TextCtrl,
+            "Leave blank to auto-detect the spoken language.",
+        )
         self.transcription_language_ctrl.SetHint("blank = auto-detect")
-        for label, ctrl in [
-            ("Provider", self.transcription_provider_ctrl),
-            ("Model (name or size)", self.transcription_model_ctrl),
-            ("Custom model path (optional)", self.transcription_model_path_ctrl),
-            ("Device", self.transcription_device_ctrl),
-            ("Compute type", self.transcription_compute_type_ctrl),
-            ("Language", self.transcription_language_ctrl),
-        ]:
-            t_grid.Add(
-                wx.StaticText(transcription_parent, label=label), 0, wx.ALIGN_CENTER_VERTICAL
-            )
-            t_grid.Add(ctrl, 1, wx.EXPAND)
         transcription.Add(t_grid, 0, wx.EXPAND | wx.ALL, 8)
         root.Add(transcription, 0, wx.EXPAND | wx.ALL, 8)
 
@@ -91,63 +136,75 @@ class SettingsPanel(wx.Panel):
         provider_choices = [p.id for p in ProviderStore().list()]
         improve_prompt_choices = [p.id for p in PromptStore().list_by_category("improve")]
         summarize_prompt_choices = [p.id for p in PromptStore().list_by_category("summarize")]
-        self.improve_provider_ctrl = wx.Choice(ai_parent, choices=provider_choices)
-        self.improve_prompt_ctrl = wx.Choice(ai_parent, choices=improve_prompt_choices)
-        self.summarize_provider_ctrl = wx.Choice(ai_parent, choices=provider_choices)
-        self.summarize_prompt_ctrl = wx.Choice(ai_parent, choices=summarize_prompt_choices)
-        self.streaming_ctrl = wx.CheckBox(ai_parent)
-        self.timeout_ctrl = wx.SpinCtrlDouble(ai_parent, min=1, max=3600, inc=1)
-        self.temperature_ctrl = wx.SpinCtrlDouble(ai_parent, min=0, max=2, inc=0.1)
-        self.max_tokens_ctrl = wx.SpinCtrl(ai_parent, min=1, max=200_000)
 
-        self.improve_model_ctrl = wx.ComboBox(ai_parent, style=wx.CB_DROPDOWN)
-        self.improve_model_ctrl.SetHint("blank = provider's own default")
-        improve_fetch_btn = wx.Button(ai_parent, label="Fetch models")
-        improve_fetch_btn.Bind(
-            wx.EVT_BUTTON,
-            lambda evt: self._on_fetch_models(self.improve_provider_ctrl, self.improve_model_ctrl),
+        self.improve_provider_ctrl = add_labelled(
+            a_grid, ai_parent, "Improve provider", lambda p: wx.Choice(p, choices=provider_choices)
         )
-        improve_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        improve_model_row.Add(self.improve_model_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
-        improve_model_row.Add(improve_fetch_btn, 0)
-
-        self.summarize_model_ctrl = wx.ComboBox(ai_parent, style=wx.CB_DROPDOWN)
-        self.summarize_model_ctrl.SetHint("blank = provider's own default")
-        summarize_fetch_btn = wx.Button(ai_parent, label="Fetch models")
-        summarize_fetch_btn.Bind(
-            wx.EVT_BUTTON,
-            lambda evt: self._on_fetch_models(
-                self.summarize_provider_ctrl, self.summarize_model_ctrl
-            ),
+        self.improve_model_ctrl = self._add_model_row(a_grid, ai_parent, "Improve model")
+        self.improve_prompt_ctrl = add_labelled(
+            a_grid,
+            ai_parent,
+            "Improve prompt",
+            lambda p: wx.Choice(p, choices=improve_prompt_choices),
         )
-        summarize_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        summarize_model_row.Add(self.summarize_model_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
-        summarize_model_row.Add(summarize_fetch_btn, 0)
-
-        for label, ctrl in [
-            ("Improve provider", self.improve_provider_ctrl),
-            ("Improve model", improve_model_row),
-            ("Improve prompt", self.improve_prompt_ctrl),
-            ("Summarize provider", self.summarize_provider_ctrl),
-            ("Summarize model", summarize_model_row),
-            ("Summarize prompt", self.summarize_prompt_ctrl),
-            ("Streaming", self.streaming_ctrl),
-            ("Timeout (s)", self.timeout_ctrl),
-            ("Temperature", self.temperature_ctrl),
-            ("Max tokens", self.max_tokens_ctrl),
-        ]:
-            a_grid.Add(wx.StaticText(ai_parent, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
-            a_grid.Add(ctrl, 1, wx.EXPAND)
+        self.summarize_provider_ctrl = add_labelled(
+            a_grid,
+            ai_parent,
+            "Summarize provider",
+            lambda p: wx.Choice(p, choices=provider_choices),
+        )
+        self.summarize_model_ctrl = self._add_model_row(a_grid, ai_parent, "Summarize model")
+        self.summarize_prompt_ctrl = add_labelled(
+            a_grid,
+            ai_parent,
+            "Summarize prompt",
+            lambda p: wx.Choice(p, choices=summarize_prompt_choices),
+        )
+        self.streaming_ctrl = add_labelled(
+            a_grid,
+            ai_parent,
+            "Streaming",
+            wx.CheckBox,
+            "Receive the model's answer incrementally rather than in one response.",
+        )
+        self.timeout_ctrl = add_labelled(
+            a_grid,
+            ai_parent,
+            "Timeout (seconds)",
+            lambda p: wx.SpinCtrlDouble(p, min=1, max=3600, inc=1),
+        )
+        self.temperature_ctrl = add_labelled(
+            a_grid,
+            ai_parent,
+            "Temperature",
+            lambda p: wx.SpinCtrlDouble(p, min=0, max=2, inc=0.1),
+            "0 is deterministic, 2 is most varied.",
+        )
+        self.max_tokens_ctrl = add_labelled(
+            a_grid, ai_parent, "Max tokens", lambda p: wx.SpinCtrl(p, min=1, max=200_000)
+        )
         ai.Add(a_grid, 0, wx.EXPAND | wx.ALL, 8)
         root.Add(ai, 0, wx.EXPAND | wx.ALL, 8)
 
         # Dictionary
         dictionary = wx.StaticBoxSizer(wx.VERTICAL, scroller, "Dictionary filter")
         dictionary_parent = dictionary.GetStaticBox()
-        self.dictionary_enabled_ctrl = wx.CheckBox(dictionary_parent, label="Enabled")
+        self.dictionary_enabled_ctrl = wx.CheckBox(dictionary_parent, label="Dictionary filter on")
+        describe(
+            self.dictionary_enabled_ctrl,
+            "Dictionary filter on",
+            "Apply the checked dictionaries' find/replace rules to transcripts.",
+        )
         dictionary.Add(self.dictionary_enabled_ctrl, 0, wx.ALL, 5)
         dictionary_ids = [d.id for d in DictionaryStore().list()]
+        dictionary_label = wx.StaticText(dictionary_parent, label="Active dictionaries")
         self.dictionary_active_ctrl = wx.CheckListBox(dictionary_parent, choices=dictionary_ids)
+        describe(
+            self.dictionary_active_ctrl,
+            "Active dictionaries",
+            "Check each dictionary to apply. Empty until you create one on the Dictionary tab.",
+        )
+        dictionary.Add(dictionary_label, 0, wx.LEFT | wx.TOP, 5)
         dictionary.Add(self.dictionary_active_ctrl, 0, wx.EXPAND | wx.ALL, 5)
         root.Add(dictionary, 0, wx.EXPAND | wx.ALL, 8)
 
@@ -156,24 +213,63 @@ class SettingsPanel(wx.Panel):
         gui_parent = gui.GetStaticBox()
         g_grid = wx.FlexGridSizer(cols=2, gap=(6, 6))
         g_grid.AddGrowableCol(1, 1)
-        self.theme_ctrl = wx.Choice(gui_parent, choices=_THEMES)
-        self.auto_open_ctrl = wx.CheckBox(gui_parent)
-        for label, ctrl in [
-            ("Theme", self.theme_ctrl),
-            ("Auto-open output folder", self.auto_open_ctrl),
-        ]:
-            g_grid.Add(wx.StaticText(gui_parent, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
-            g_grid.Add(ctrl, 1, wx.EXPAND)
+        self.theme_ctrl = add_labelled(
+            g_grid,
+            gui_parent,
+            "Theme",
+            lambda p: wx.Choice(p, choices=_THEMES),
+            "'system' follows your OS colours and is the only one that respects "
+            "Windows High Contrast.",
+        )
+        self.auto_open_ctrl = add_labelled(
+            g_grid,
+            gui_parent,
+            "Auto-open output folder",
+            wx.CheckBox,
+            "Open the working directory in your file manager when a run finishes.",
+        )
         gui.Add(g_grid, 0, wx.EXPAND | wx.ALL, 8)
         root.Add(gui, 0, wx.EXPAND | wx.ALL, 8)
 
         scroller.SetSizer(root)
         outer.Add(scroller, 1, wx.EXPAND)
 
-        save_btn = wx.Button(self, label="Save settings")
+        save_btn = wx.Button(self, label="&Save settings")
+        describe(save_btn, "Save settings", "Write every field on this tab to the config file.")
         save_btn.Bind(wx.EVT_BUTTON, self._on_save)
         outer.Add(save_btn, 0, wx.ALL, 8)
         self.SetSizer(outer)
+
+    def _add_model_row(self, grid: wx.Sizer, parent: wx.Window, label: str) -> wx.ComboBox:
+        """A model combo box plus its "Fetch models" button, as one labelled grid row."""
+        static = wx.StaticText(parent, label=label)
+        model_ctrl = wx.ComboBox(parent, style=wx.CB_DROPDOWN)
+        model_ctrl.SetHint("blank = provider's own default")
+        describe(
+            model_ctrl,
+            label,
+            "Type a model id, or leave blank to use the provider's own default. "
+            "Use the Fetch models button to fill the list.",
+        )
+        fetch_btn = wx.Button(parent, label="Fetch models")
+        describe(
+            fetch_btn,
+            f"Fetch models for {label.split(maxsplit=1)[0].lower()}",
+            "Ask the selected provider which models it offers, and fill the list above.",
+        )
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(model_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
+        row.Add(fetch_btn, 0)
+        grid.Add(static, 0, wx.ALIGN_CENTER_VERTICAL)
+        grid.Add(row, 1, wx.EXPAND)
+
+        provider_ctrl_name = f"{label.split(maxsplit=1)[0].lower()}_provider_ctrl"
+        fetch_btn.Bind(
+            wx.EVT_BUTTON,
+            lambda _evt: self._on_fetch_models(getattr(self, provider_ctrl_name), model_ctrl),
+        )
+        return model_ctrl
 
     def _populate(self, settings: AppSettings) -> None:
         self.work_dir_ctrl.SetPath(settings.work_dir)
@@ -297,3 +393,4 @@ class SettingsPanel(wx.Panel):
         current = model_ctrl.GetValue()
         model_ctrl.Set(model_ids)
         model_ctrl.SetValue(current)
+        wx.MessageBox(f"Fetched {len(model_ids)} models from {provider_id!r}.", "SummaRibe")

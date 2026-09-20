@@ -8,6 +8,7 @@ import wx
 
 from summaribe.ai.prompts import PromptStore, SystemPrompt
 from summaribe.core.exceptions import ConfigError, RegistryError
+from summaribe.gui.accessibility import add_labelled, add_stacked, describe
 
 
 class PromptEditorPanel(wx.Panel):
@@ -21,13 +22,22 @@ class PromptEditorPanel(wx.Panel):
         root = wx.BoxSizer(wx.HORIZONTAL)
 
         left = wx.BoxSizer(wx.VERTICAL)
+        list_label = wx.StaticText(self, label="Prompts")
         self.list_box = wx.ListBox(self, size=(240, -1))
+        describe(
+            self.list_box,
+            "Prompts",
+            "Select a prompt to load it into the form on the right.",
+        )
         self.list_box.Bind(wx.EVT_LISTBOX, self._on_select)
+        left.Add(list_label, 0, wx.LEFT | wx.TOP, 5)
         left.Add(self.list_box, 1, wx.EXPAND | wx.ALL, 5)
         btn_row = wx.BoxSizer(wx.HORIZONTAL)
-        new_btn = wx.Button(self, label="New")
+        new_btn = wx.Button(self, label="&New")
+        describe(new_btn, "New prompt", "Fill the form with a blank prompt and a fresh id.")
         new_btn.Bind(wx.EVT_BUTTON, self._on_new)
-        delete_btn = wx.Button(self, label="Delete")
+        delete_btn = wx.Button(self, label="&Delete")
+        describe(delete_btn, "Delete prompt", "Delete the prompt selected in the list.")
         delete_btn.Bind(wx.EVT_BUTTON, self._on_delete)
         btn_row.Add(new_btn, 0, wx.RIGHT, 5)
         btn_row.Add(delete_btn, 0)
@@ -38,26 +48,33 @@ class PromptEditorPanel(wx.Panel):
         grid = wx.FlexGridSizer(cols=2, gap=(6, 6))
         grid.AddGrowableCol(1, 1)
 
-        self.id_ctrl = wx.TextCtrl(self)
-        self.name_ctrl = wx.TextCtrl(self)
-        self.category_ctrl = wx.Choice(self, choices=["improve", "summarize"])
-        self.description_ctrl = wx.TextCtrl(self)
-
-        for label, ctrl in [
-            ("Id", self.id_ctrl),
-            ("Name", self.name_ctrl),
-            ("Category", self.category_ctrl),
-            ("Description", self.description_ctrl),
-        ]:
-            grid.Add(wx.StaticText(self, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
-            grid.Add(ctrl, 1, wx.EXPAND)
+        self.id_ctrl = add_labelled(
+            grid, self, "Prompt id", wx.TextCtrl, "Unique identifier used in settings and the CLI."
+        )
+        self.name_ctrl = add_labelled(
+            grid, self, "Prompt name", wx.TextCtrl, "Human-readable name."
+        )
+        self.category_ctrl = add_labelled(
+            grid,
+            self,
+            "Category",
+            lambda p: wx.Choice(p, choices=["improve", "summarize"]),
+            "Which pipeline step this prompt can be selected for.",
+        )
+        self.description_ctrl = add_labelled(grid, self, "Prompt description", wx.TextCtrl)
         right.Add(grid, 0, wx.EXPAND | wx.ALL, 8)
 
-        right.Add(wx.StaticText(self, label="Prompt content"), 0, wx.LEFT, 8)
-        self.content_ctrl = wx.TextCtrl(self, style=wx.TE_MULTILINE, size=(-1, 260))
-        right.Add(self.content_ctrl, 1, wx.EXPAND | wx.ALL, 8)
+        self.content_ctrl = add_stacked(
+            right,
+            self,
+            "Prompt content",
+            lambda p: wx.TextCtrl(p, style=wx.TE_MULTILINE, size=(-1, 260)),
+            "The system prompt text sent to the AI provider.",
+            proportion=1,
+        )
 
-        save_btn = wx.Button(self, label="Save")
+        save_btn = wx.Button(self, label="&Save")
+        describe(save_btn, "Save prompt", "Write the form above to disk.")
         save_btn.Bind(wx.EVT_BUTTON, self._on_save)
         right.Add(save_btn, 0, wx.ALL, 8)
 
@@ -98,10 +115,13 @@ class PromptEditorPanel(wx.Panel):
                 content="",
             )
         )
+        self.name_ctrl.SetFocus()
 
     def _on_delete(self, _event: wx.CommandEvent) -> None:
         index = self.list_box.GetSelection()
         if index == wx.NOT_FOUND:
+            wx.MessageBox("Select a prompt to delete first.", "SummaRibe", wx.ICON_WARNING)
+            self.list_box.SetFocus()
             return
         prompt_id = self.list_box.GetClientData(index)
         try:
@@ -110,6 +130,7 @@ class PromptEditorPanel(wx.Panel):
             wx.MessageBox(str(exc), "SummaRibe", wx.ICON_ERROR)
             return
         self._reload_list()
+        self.list_box.SetFocus()
 
     def _on_save(self, _event: wx.CommandEvent) -> None:
         category = self.category_ctrl.GetStringSelection() or "improve"

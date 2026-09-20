@@ -13,6 +13,7 @@ import wx
 
 from summaribe.core.config import SettingsManager
 from summaribe.core.pipeline import Pipeline, PipelineContext, PipelineStep
+from summaribe.gui.accessibility import add_stacked, announce, describe
 from summaribe.steps import DownloadStep, ImproveStep, SummarizeStep, TranscribeStep
 
 STEP_CLASSES: dict[str, Callable[[], PipelineStep]] = {
@@ -20,6 +21,13 @@ STEP_CLASSES: dict[str, Callable[[], PipelineStep]] = {
     "transcribe": TranscribeStep,
     "improve": ImproveStep,
     "summarize": SummarizeStep,
+}
+
+_STEP_DESCRIPTIONS = {
+    "download": "Fetch the audio for the URL above with yt-dlp.",
+    "transcribe": "Turn the audio into a raw transcript with the configured speech-to-text model.",
+    "improve": "Ask the AI provider to clean up punctuation and wording in the raw transcript.",
+    "summarize": "Ask the AI provider for a summary of the transcript.",
 }
 
 EVT_PIPELINE_LOG = wx.NewEventType()
@@ -54,50 +62,106 @@ class PipelinePanel(wx.Panel):
 
         input_box = wx.StaticBoxSizer(wx.VERTICAL, self, "Input")
         input_parent = input_box.GetStaticBox()
+
+        source_label = wx.StaticText(input_parent, label="Source URL or file path")
         self.source_ctrl = wx.TextCtrl(input_parent, value="")
         self.source_ctrl.SetHint("URL to download, or path to an existing audio/transcript file")
-        browse_btn = wx.Button(input_parent, label="Browse file...")
+        describe(
+            self.source_ctrl,
+            "Source URL or file path",
+            "Either a URL to download, or the path of an audio file or a .txt/.md transcript "
+            "you already have.",
+        )
+        browse_btn = wx.Button(input_parent, label="&Browse file...")
+        describe(
+            browse_btn,
+            "Browse for a source file",
+            "Open a file dialog and put the chosen path in the source field.",
+        )
         browse_btn.Bind(wx.EVT_BUTTON, self._on_browse)
         row = wx.BoxSizer(wx.HORIZONTAL)
         row.Add(self.source_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
         row.Add(browse_btn, 0)
+        input_box.Add(source_label, 0, wx.LEFT | wx.TOP, 5)
         input_box.Add(row, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.work_dir_picker = wx.DirPickerCtrl(
+        self.work_dir_picker = add_stacked(
+            input_box,
             input_parent,
-            path=self.settings_manager.settings.work_dir,
-            message="Choose working directory",
+            "Working directory for this run",
+            lambda p: wx.DirPickerCtrl(
+                p,
+                path=self.settings_manager.settings.work_dir,
+                message="Choose working directory",
+            ),
+            "Downloads, transcripts and summaries from this run are written here.",
+            border=5,
         )
-        input_box.Add(self.work_dir_picker, 0, wx.EXPAND | wx.ALL, 5)
         root.Add(input_box, 0, wx.EXPAND | wx.ALL, 8)
 
         steps_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, "Steps to run")
         steps_parent = steps_box.GetStaticBox()
         self.step_checks: dict[str, wx.CheckBox] = {}
         for step_name in STEP_CLASSES:
-            checkbox = wx.CheckBox(steps_parent, label=step_name.capitalize())
+            label = step_name.capitalize()
+            checkbox = wx.CheckBox(steps_parent, label=label)
             checkbox.SetValue(True)
+            describe(checkbox, f"{label} step", _STEP_DESCRIPTIONS[step_name])
             steps_box.Add(checkbox, 0, wx.ALL, 5)
             self.step_checks[step_name] = checkbox
         root.Add(steps_box, 0, wx.EXPAND | wx.ALL, 8)
 
-        self.run_btn = wx.Button(self, label="Run")
+        run_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.run_btn = wx.Button(self, label="&Run")
+        describe(self.run_btn, "Run", "Start the checked steps against the source above.")
         self.run_btn.Bind(wx.EVT_BUTTON, self._on_run)
-        root.Add(self.run_btn, 0, wx.ALL, 8)
+        run_row.Add(self.run_btn, 0, wx.RIGHT, 8)
 
-        self.log_ctrl = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY)
-        root.Add(self.log_ctrl, 1, wx.EXPAND | wx.ALL, 8)
+        # A named, focusable-by-screen-reader home for "what is happening right now",
+        # so the state of a run is not conveyed by the disabled Run button alone.
+        self.status_label = wx.StaticText(self, label="Ready")
+        describe(self.status_label, "Ready")
+        run_row.Add(self.status_label, 1, wx.ALIGN_CENTER_VERTICAL)
+        root.Add(run_row, 0, wx.EXPAND | wx.ALL, 8)
 
+        self.progress = wx.Gauge(self, style=wx.GA_HORIZONTAL)
+        describe(self.progress, "Pipeline progress")
+        self.progress.Hide()
+        root.Add(self.progress, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
+
+        self.log_ctrl = add_stacked(
+            root,
+            self,
+            "Run log",
+            lambda p: wx.TextCtrl(p, style=wx.TE_MULTILINE | wx.TE_READONLY),
+            "Progress messages from each step, newest at the bottom. Read-only.",
+            proportion=1,
+        )
+
+        results_label = wx.StaticText(self, label="Results")
         self.results = wx.Notebook(self)
+        describe(self.results, "Results", "One tab per pipeline output.")
         self.raw_ctrl = wx.TextCtrl(self.results, style=wx.TE_MULTILINE | wx.TE_READONLY)
         self.improved_ctrl = wx.TextCtrl(self.results, style=wx.TE_MULTILINE | wx.TE_READONLY)
         self.summary_ctrl = wx.TextCtrl(self.results, style=wx.TE_MULTILINE | wx.TE_READONLY)
+        describe(self.raw_ctrl, "Raw transcript", "Read-only output of the transcribe step.")
+        describe(self.improved_ctrl, "Improved transcript", "Read-only output of the improve step.")
+        describe(self.summary_ctrl, "Summary", "Read-only output of the summarize step.")
         self.results.AddPage(self.raw_ctrl, "Raw transcript")
         self.results.AddPage(self.improved_ctrl, "Improved transcript")
         self.results.AddPage(self.summary_ctrl, "Summary")
+        root.Add(results_label, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.results, 1, wx.EXPAND | wx.ALL, 8)
 
         self.SetSizer(root)
+
+    def _set_status(self, message: str, *, notify: bool = True) -> None:
+        """Update the status line. `notify` only for run-state changes, not every log
+        line -- if a screen reader does honour the name-change event, per-line
+        notifications would talk over whatever the user is reading."""
+        self.status_label.SetLabel(message)
+        if notify:
+            announce(self.status_label, message)
 
     def _on_browse(self, _event: wx.CommandEvent) -> None:
         with wx.FileDialog(self, "Choose a file", style=wx.FD_OPEN) as dialog:
@@ -108,10 +172,12 @@ class PipelinePanel(wx.Panel):
         source = self.source_ctrl.GetValue().strip()
         if not source:
             wx.MessageBox("Enter a URL or choose a file first.", "SummaRibe", wx.ICON_WARNING)
+            self.source_ctrl.SetFocus()
             return
         selected = [name for name, box in self.step_checks.items() if box.GetValue()]
         if not selected:
             wx.MessageBox("Select at least one step.", "SummaRibe", wx.ICON_WARNING)
+            next(iter(self.step_checks.values())).SetFocus()
             return
 
         work_dir = Path(self.work_dir_picker.GetPath() or self.settings_manager.settings.work_dir)
@@ -120,6 +186,10 @@ class PipelinePanel(wx.Panel):
         self.improved_ctrl.Clear()
         self.summary_ctrl.Clear()
         self.run_btn.Disable()
+        self.progress.Show()
+        self.progress.Pulse()
+        self.Layout()
+        self._set_status(f"Running {len(selected)} steps...")
 
         thread = threading.Thread(
             target=self._run_pipeline_thread, args=(source, work_dir, selected), daemon=True
@@ -149,11 +219,19 @@ class PipelinePanel(wx.Panel):
 
     def _on_log(self, event: _LogEvent) -> None:
         self.log_ctrl.AppendText(event.message + "\n")
+        self.progress.Pulse()
+        self._set_status(event.message, notify=False)
 
     def _on_done(self, event: _DoneEvent) -> None:
         self.run_btn.Enable()
+        self.progress.Hide()
+        self.Layout()
         if event.error:
+            self._set_status("Run failed.")
+            # A modal dialog is the one notification every screen reader announces
+            # reliably, so failures go through it rather than the status line alone.
             wx.MessageBox(event.error, "SummaRibe - step failed", wx.ICON_ERROR)
+            self.run_btn.SetFocus()
             return
         context = event.context
         if context is None:
@@ -162,3 +240,13 @@ class PipelinePanel(wx.Panel):
         self.improved_ctrl.SetValue(context.transcript_improved or "")
         self.summary_ctrl.SetValue(context.summary or "")
         self.log_ctrl.AppendText("Done.\n")
+        self._set_status("Done.")
+
+        # Moving focus onto the filled-in result is the announcement: a screen reader
+        # reads the newly focused tab and its contents, which no status text can force.
+        pages = {self.raw_ctrl: 0, self.improved_ctrl: 1, self.summary_ctrl: 2}
+        for ctrl in (self.summary_ctrl, self.improved_ctrl, self.raw_ctrl):
+            if ctrl.GetValue():
+                self.results.SetSelection(pages[ctrl])
+                ctrl.SetFocus()
+                break

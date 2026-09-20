@@ -15,6 +15,7 @@ import wx
 from summaribe.ai.registry import ProviderStore
 from summaribe.ai.schema import ProviderConfig
 from summaribe.core.exceptions import ConfigError, RegistryError
+from summaribe.gui.accessibility import add_labelled, add_stacked, describe
 
 
 class ProviderEditorPanel(wx.Panel):
@@ -28,13 +29,22 @@ class ProviderEditorPanel(wx.Panel):
         root = wx.BoxSizer(wx.HORIZONTAL)
 
         left = wx.BoxSizer(wx.VERTICAL)
+        list_label = wx.StaticText(self, label="Providers")
         self.list_box = wx.ListBox(self, size=(220, -1))
+        describe(
+            self.list_box,
+            "Providers",
+            "Select a provider to load it into the form on the right.",
+        )
         self.list_box.Bind(wx.EVT_LISTBOX, self._on_select)
+        left.Add(list_label, 0, wx.LEFT | wx.TOP, 5)
         left.Add(self.list_box, 1, wx.EXPAND | wx.ALL, 5)
         btn_row = wx.BoxSizer(wx.HORIZONTAL)
-        new_btn = wx.Button(self, label="New")
+        new_btn = wx.Button(self, label="&New")
+        describe(new_btn, "New provider", "Fill the form with a blank provider and a fresh id.")
         new_btn.Bind(wx.EVT_BUTTON, self._on_new)
-        delete_btn = wx.Button(self, label="Delete")
+        delete_btn = wx.Button(self, label="&Delete")
+        describe(delete_btn, "Delete provider", "Delete the provider selected in the list.")
         delete_btn.Bind(wx.EVT_BUTTON, self._on_delete)
         btn_row.Add(new_btn, 0, wx.RIGHT, 5)
         btn_row.Add(delete_btn, 0)
@@ -45,52 +55,96 @@ class ProviderEditorPanel(wx.Panel):
         grid = wx.FlexGridSizer(cols=2, gap=(6, 6))
         grid.AddGrowableCol(1, 1)
 
-        self.id_ctrl = wx.TextCtrl(self)
-        self.name_ctrl = wx.TextCtrl(self)
-        self.description_ctrl = wx.TextCtrl(self)
-        self.base_url_ctrl = wx.TextCtrl(self)
-        self.endpoint_ctrl = wx.TextCtrl(self)
-        self.method_ctrl = wx.Choice(self, choices=["POST", "GET"])
-        self.api_key_env_ctrl = wx.TextCtrl(self)
-        self.timeout_ctrl = wx.SpinCtrlDouble(self, min=1, max=3600, inc=1)
-        self.stream_ctrl = wx.CheckBox(self)
-        self.stream_format_ctrl = wx.Choice(self, choices=["sse", "ndjson"])
-        self.response_path_ctrl = wx.TextCtrl(self)
-        self.stream_delta_path_ctrl = wx.TextCtrl(self)
-        self.stream_done_path_ctrl = wx.TextCtrl(self)
-
-        for label, ctrl in [
-            ("Id", self.id_ctrl),
-            ("Name", self.name_ctrl),
-            ("Description", self.description_ctrl),
-            ("Base URL", self.base_url_ctrl),
-            ("Endpoint", self.endpoint_ctrl),
-            ("Method", self.method_ctrl),
-            ("API key env var", self.api_key_env_ctrl),
-            ("Timeout (s)", self.timeout_ctrl),
-            ("Stream", self.stream_ctrl),
-            ("Stream format", self.stream_format_ctrl),
-            ("Response path", self.response_path_ctrl),
-            ("Stream delta path", self.stream_delta_path_ctrl),
-            ("Stream done path", self.stream_done_path_ctrl),
-        ]:
-            grid.Add(wx.StaticText(self, label=label), 0, wx.ALIGN_CENTER_VERTICAL)
-            grid.Add(ctrl, 1, wx.EXPAND)
+        self.id_ctrl = add_labelled(
+            grid,
+            self,
+            "Provider id",
+            wx.TextCtrl,
+            "Unique identifier used in settings and the CLI.",
+        )
+        self.name_ctrl = add_labelled(
+            grid, self, "Provider name", wx.TextCtrl, "Human-readable name."
+        )
+        self.description_ctrl = add_labelled(grid, self, "Provider description", wx.TextCtrl)
+        self.base_url_ctrl = add_labelled(
+            grid,
+            self,
+            "Base URL",
+            wx.TextCtrl,
+            "Scheme and host, for example https://api.example.com",
+        )
+        self.endpoint_ctrl = add_labelled(
+            grid,
+            self,
+            "Endpoint",
+            wx.TextCtrl,
+            "Path appended to the base URL, for example /v1/chat/completions",
+        )
+        self.method_ctrl = add_labelled(
+            grid, self, "HTTP method", lambda p: wx.Choice(p, choices=["POST", "GET"])
+        )
+        self.api_key_env_ctrl = add_labelled(
+            grid,
+            self,
+            "API key environment variable",
+            wx.TextCtrl,
+            "Name of the environment variable holding the key. The key itself is never "
+            "stored in this config.",
+        )
+        self.timeout_ctrl = add_labelled(
+            grid, self, "Timeout (seconds)", lambda p: wx.SpinCtrlDouble(p, min=1, max=3600, inc=1)
+        )
+        self.stream_ctrl = add_labelled(
+            grid, self, "Stream", wx.CheckBox, "Whether this provider streams its response."
+        )
+        self.stream_format_ctrl = add_labelled(
+            grid,
+            self,
+            "Stream format",
+            lambda p: wx.Choice(p, choices=["sse", "ndjson"]),
+            "Wire format of the streamed response.",
+        )
+        self.response_path_ctrl = add_labelled(
+            grid,
+            self,
+            "Response path",
+            wx.TextCtrl,
+            "Dotted path to the text in a non-streamed reply, for example "
+            "choices.0.message.content",
+        )
+        self.stream_delta_path_ctrl = add_labelled(
+            grid, self, "Stream delta path", wx.TextCtrl, "Dotted path to each streamed chunk."
+        )
+        self.stream_done_path_ctrl = add_labelled(
+            grid, self, "Stream done path", wx.TextCtrl, "Dotted path to the end-of-stream marker."
+        )
         right.Add(grid, 0, wx.EXPAND | wx.ALL, 8)
 
-        right.Add(wx.StaticText(self, label="Headers (JSON object)"), 0, wx.LEFT | wx.TOP, 8)
-        self.headers_ctrl = wx.TextCtrl(self, style=wx.TE_MULTILINE, size=(-1, 60))
-        right.Add(self.headers_ctrl, 0, wx.EXPAND | wx.ALL, 8)
+        self.headers_ctrl = add_stacked(
+            right,
+            self,
+            "Headers (JSON object)",
+            lambda p: wx.TextCtrl(p, style=wx.TE_MULTILINE, size=(-1, 60)),
+            "Extra HTTP headers, as a JSON object.",
+        )
+        self.request_template_ctrl = add_stacked(
+            right,
+            self,
+            "Request template (JSON)",
+            lambda p: wx.TextCtrl(p, style=wx.TE_MULTILINE, size=(-1, 140)),
+            "Request body as JSON, with {{variable}} placeholders.",
+            proportion=1,
+        )
+        self.variables_ctrl = add_stacked(
+            right,
+            self,
+            "Default variables (JSON)",
+            lambda p: wx.TextCtrl(p, style=wx.TE_MULTILINE, size=(-1, 60)),
+            "Default values for the placeholders used in the request template.",
+        )
 
-        right.Add(wx.StaticText(self, label="Request template (JSON)"), 0, wx.LEFT, 8)
-        self.request_template_ctrl = wx.TextCtrl(self, style=wx.TE_MULTILINE, size=(-1, 140))
-        right.Add(self.request_template_ctrl, 1, wx.EXPAND | wx.ALL, 8)
-
-        right.Add(wx.StaticText(self, label="Default variables (JSON)"), 0, wx.LEFT, 8)
-        self.variables_ctrl = wx.TextCtrl(self, style=wx.TE_MULTILINE, size=(-1, 60))
-        right.Add(self.variables_ctrl, 0, wx.EXPAND | wx.ALL, 8)
-
-        save_btn = wx.Button(self, label="Save")
+        save_btn = wx.Button(self, label="&Save")
+        describe(save_btn, "Save provider", "Write the form above to disk.")
         save_btn.Bind(wx.EVT_BUTTON, self._on_save)
         right.Add(save_btn, 0, wx.ALL, 8)
 
@@ -151,10 +205,13 @@ class ProviderEditorPanel(wx.Panel):
             variables={"model": "model-name", "temperature": 0.3, "max_tokens": 2048},
         )
         self._populate(blank)
+        self.name_ctrl.SetFocus()
 
     def _on_delete(self, _event: wx.CommandEvent) -> None:
         index = self.list_box.GetSelection()
         if index == wx.NOT_FOUND:
+            wx.MessageBox("Select a provider to delete first.", "SummaRibe", wx.ICON_WARNING)
+            self.list_box.SetFocus()
             return
         provider_id = self.list_box.GetClientData(index)
         try:
@@ -163,6 +220,7 @@ class ProviderEditorPanel(wx.Panel):
             wx.MessageBox(str(exc), "SummaRibe", wx.ICON_ERROR)
             return
         self._reload_list()
+        self.list_box.SetFocus()
 
     def _on_save(self, _event: wx.CommandEvent) -> None:
         try:

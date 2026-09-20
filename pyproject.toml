@@ -70,6 +70,8 @@ known-first-party = ["summaribe"]
 # so the CLI/importing the package stays fast and works without every extra installed.
 "src/summaribe/transcription/*" = ["PLC0415"]
 "src/summaribe/gui/*" = ["PLC0415"]
+# wx.Accessible is overridden with wxWidgets' own CamelCase method names.
+"src/summaribe/gui/accessibility.py" = ["PLC0415", "N802", "N803"]
 "src/summaribe/steps/download.py" = ["PLC0415"]
 "src/summaribe/cli.py" = ["PLC0415"]
 
