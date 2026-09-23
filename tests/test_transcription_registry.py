@@ -1,3 +1,4 @@
+import importlib
 from pathlib import Path
 
 import pytest
@@ -26,14 +27,33 @@ def test_create_provider_instantiates_with_config():
     assert provider.model_name_or_path == "tiny"
 
 
-def test_provider_without_dependency_installed_is_unavailable():
-    # None of the heavy ML extras are installed in the test environment.
-    for provider_id in ("whisper", "parakeet", "qwen3_asr"):
-        provider = create_provider(provider_id)
-        assert provider.is_available() is False
+# The heavy ML extras are optional, so these tests follow the environment they
+# run in rather than assuming the dependency is missing.
+_PROVIDER_MODULES = {
+    "whisper": ("faster_whisper",),
+    "parakeet": ("nemo.collections.asr",),
+    "qwen3_asr": ("soundfile", "torch", "transformers"),
+}
+
+
+def _importable(modules: tuple[str, ...]) -> bool:
+    for module in modules:
+        try:
+            importlib.import_module(module)
+        except ImportError:
+            return False
+    return True
+
+
+@pytest.mark.parametrize("provider_id,modules", sorted(_PROVIDER_MODULES.items()))
+def test_provider_availability_tracks_its_dependency(provider_id: str, modules: tuple[str, ...]):
+    provider = create_provider(provider_id)
+    assert provider.is_available() is _importable(modules)
 
 
 def test_transcribe_without_dependency_raises_provider_unavailable(tmp_path: Path):
+    if _importable(_PROVIDER_MODULES["whisper"]):
+        pytest.skip("faster-whisper is installed; nothing to be unavailable")
     audio = tmp_path / "audio.wav"
     audio.write_bytes(b"not-real-audio")
     provider = create_provider("whisper", model="tiny")

@@ -74,6 +74,10 @@ uv run summaribe dictionary import my-terms.json
 uv run summaribe settings show
 ```
 
+## Transcription on the GPU
+
+The transcription device defaults to `auto`, which uses the GPU only when the CUDA runtime is actually usable and transcribes on the CPU otherwise. Whisper (via faster-whisper/CTranslate2) needs cuBLAS 12 and cuDNN 9 in addition to an NVIDIA driver; install them with `uv pip install nvidia-cublas-cu12 nvidia-cudnn-cu12`. Setting the device to `cuda` explicitly disables the CPU fallback, so a missing CUDA library is reported as an error instead of quietly costing you GPU speed.
+
 ## Configuring an AI provider
 
 A provider is one JSON file (see `src/summaribe/data/providers/*.json` for the shipped defaults). The request body is a *template*: `"{{name}}"` is replaced with a variable, and a string that is *only* a placeholder (e.g. `"messages": "{{messages}}"`) is replaced with the raw value (a list, bool, number, ...) rather than stringified, so structured data can be spliced in.
