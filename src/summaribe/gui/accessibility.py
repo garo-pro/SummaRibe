@@ -26,13 +26,15 @@ tab order in the same order.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 
 import wx
 
-#: ``wx.Accessible`` is a Windows-only class; everywhere else `describe` relies on
+#: ``wx.Accessible`` only works on Windows: macOS builds export the class but its
+#: constructor raises ``NotImplementedError``. Everywhere else `describe` relies on
 #: the static-text-before-control ordering that `add_labelled` guarantees.
-ACCESSIBILITY_AVAILABLE = hasattr(wx, "Accessible")
+ACCESSIBILITY_AVAILABLE = wx.Platform == "__WXMSW__" and hasattr(wx, "Accessible")
 
 
 if ACCESSIBILITY_AVAILABLE:
@@ -185,7 +187,9 @@ def uses_high_contrast() -> bool:
     An app that hardcodes its own colours has to stand down in that mode, or it
     silently overrides the exact colour scheme the user chose for legibility.
     """
-    if wx.Platform != "__WXMSW__":
+    # ``sys.platform`` rather than ``wx.Platform`` so mypy on other platforms treats
+    # the ``ctypes.windll`` access below as unreachable instead of an error.
+    if sys.platform != "win32":
         return False
     import ctypes
 
